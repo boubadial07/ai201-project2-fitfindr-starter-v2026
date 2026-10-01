@@ -44,19 +44,10 @@ Given a query that matches no listings, the agent stops before calling
 
 ## 3. Something about state
 
-<!-- YOU WRITE THIS ONE.
-
-     How would you know that the item your search found is the same item the
-     next tool received? Name something countable or observable.
-
-     This is the criterion people find hardest, because state failure doesn't
-     look like state failure — it looks like a tool problem. Something that
-     compares session["selected_item"] against what actually reached
-     suggest_outfit is the shape you're after. -->
-
-
+Given a query that returns at least one listing, `session["selected_item"]` matches the `new_item` received by `suggest_outfit` in at least 4 of 5 runs.
 
 **Why this target:**
+This directly checks that the item found by `search_listings` is actually carried through the session state into the next tool. I chose 4 of 5 because the agent depends on the selected result from the search, and one miss would still reveal a state-handling problem without requiring a perfect target.
 
 
 
@@ -64,37 +55,20 @@ Given a query that matches no listings, the agent stops before calling
 
 ## 4. Something about the fit card
 
-<!-- YOU WRITE THIS ONE.
-
-     The fit card calls a model, so the same input can produce different words
-     each time. That's not a bug — it's the nature of the tool. So what would
-     make it acceptable?
-
-     Think about what you'd actually be unhappy to see. A caption that never
-     mentions the price? Two different items producing the same opening
-     sentence? A card longer than a caption anyone would post? Any of those can
-     be turned into a number. -->
-
-
+Given a successful run, at least 4 of 5 generated fit cards mention the selected item's title (or identifying item description), price, and platform.
 
 **Why this target:**
-
+The tool specification says the caption should mention the item, price, and platform once each, while allowing the model's wording to vary. I chose 4 of 5 because model-generated wording can vary between runs, so the criterion checks the required content instead of requiring identical text.
 
 
 ---
 
 ## 5. Your choice
 
-<!-- YOU WRITE THIS ONE TOO.
-
-     Pick something you actually care about getting right. Speed, the empty
-     wardrobe path, what happens when the model can't be reached, whether the
-     search respects a price ceiling — anything, as long as it names a number
-     or an observable outcome. -->
-
-
+For 5 queries that specify a maximum price, every returned listing has a price less than or equal to the requested maximum.
 
 **Why this target:**
+`max_price` is an explicit input to `search_listings`, so respecting the price ceiling is a behavior I can check directly from the returned listing data. I chose 5 of 5 because a price above the user's stated maximum would be an observable search error.
 
 
 
