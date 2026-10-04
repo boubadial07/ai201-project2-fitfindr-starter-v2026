@@ -39,123 +39,191 @@
 
 ## What This Does
 
-<!-- Three or four sentences: what a user asks for, and what they get back. -->
+FitFindr is a thrift-shopping assistant that helps a user find a clothing item,
+style it with their existing wardrobe, and create a short fit-card caption.
 
+The user enters a natural-language request such as:
 
+`vintage graphic tee under $30`
 
----
+FitFindr:
+1. Parses the request into a description, size, and maximum price.
+2. Searches the thrift listings for matching items.
+3. Selects the best matching listing.
+4. Suggests one or two outfits using the user's wardrobe.
+5. Creates a short social-media-style fit card.
+
+If no listings match the request, the agent stops after the search and tells the
+user what they can change instead of continuing to the outfit and fit-card steps.
 
 ## Tool Inventory
 
-<!-- Four lines per tool. This is worth 2 points and it's the single most
-     common place students lose them.
-
-     "Returns a list" earns NOTHING. The description has to say what is IN
-     the list.
-
-     The empty case isn't optional either — it's the thing your loop branches
-     on, and if you don't decide it here you'll discover it as a crash in
-     Milestone 5. -->
-
 ### `search_listings`
 
-- **What it does:**
-- **Inputs:** <!-- name and type each: `max_price` (float), not "a price" -->
-- **Returns:**
-- **When it has nothing:**
+**What it does:** Searches the thrift listings for items matching the user's
+description and optional filters.
+
+**Inputs:**
+- `description: str` — keywords describing the item.
+- `size: str | None` — optional requested size.
+- `max_price: float | None` — optional maximum price, inclusive.
+
+**Returns:** A list of matching listing dictionaries, ranked by keyword
+overlap and limited by `config.SEARCH_RESULT_LIMIT`.
+
+**When nothing matches:** Returns an empty list `[]`.
+
+For size matching, the search accepts an exact size or a size component such as
+`M` in `S/M`, rather than using a naive substring test.
 
 ### `suggest_outfit`
 
-- **What it does:**
-- **Inputs:**
-- **Returns:**
-- **When it has nothing:**
+**What it does:** Uses the model to suggest one or two outfits for the selected
+thrift item.
+
+**Inputs:**
+- `new_item: dict` — the selected listing.
+- `wardrobe: dict` — the user's wardrobe, containing an `items` list.
+
+**Returns:** A non-empty string containing outfit suggestions.
+
+**When the wardrobe is empty:** Returns general styling advice for the new item
+instead of failing or returning an empty string.
 
 ### `create_fit_card`
 
-- **What it does:**
-- **Inputs:**
-- **Returns:**
-- **When it has nothing:**
+**What it does:** Uses the model to create a short social-media-style caption
+for the selected item and outfit.
 
----
+**Inputs:**
+- `outfit: str` — the outfit suggestion.
+- `new_item: dict` — the selected listing.
+
+**Returns:** A two-to-four sentence fit-card caption mentioning the item, price,
+and platform.
+
+**When there is no outfit:** Returns a descriptive message instead of calling
+the model.
 
 ## Planning Loop
 
-<!-- Your branch rule, stated as a rule — the condition AND both paths — plus
-     the file and function that holds it.
+The planning loop is implemented in `agent.py`.
 
-     Like this:
-       "If search_listings returns an empty list, put a message in the session
-        and stop. Otherwise take the first result and go to suggest_outfit."
-        — agent.py::run_agent
+The flow is:
 
-     The grader checks your code against what you claim here, so the file and
-     function have to be real. -->
+`user query → parse query → search_listings → branch → suggest_outfit → create_fit_card`
 
-**Branch rule:**
+The query parser uses regular expressions to extract:
+- the maximum price from values such as `$30`
+- the size from phrases such as `size M`
 
-**Where it lives:** `agent.py::run_agent`
+The remaining text becomes the item description.
 
-**How the query is parsed:** <!-- regex, string splitting, or asking the model — say which -->
+After `search_listings()` runs, the agent checks the returned list.
 
-**What moves through the session:** <!-- which fields, in what order -->
+**If results are found:**
+1. The first result is stored in `session["selected_item"]`.
+2. That same selected item is passed to `suggest_outfit()`.
+3. The outfit suggestion is stored in session state.
+4. `create_fit_card()` receives the outfit and the same selected item.
+5. The completed session is returned.
 
----
+**If no results are found:**
+- `session["error"]` is set with a message explaining what the user can
+  change.
+- The session is returned immediately.
+- `suggest_outfit()` and `create_fit_card()` are not called.
+
+The loop also calls `trace.check_iterations()` to enforce the configured
+maximum iteration count.
 
 ## Sample Run
 
-<!-- Two things go here.
+### Successful search
 
-     1. One FULL query and its output, pasted as text.
-     2. Your three per-tool terminal tests — the command and what it printed. -->
+Command:
 
-**One full query**
+```text
+python app.py ask 'vintage graphic tee under $30'
 
-```
-$ python app.py ask '...'
+Output:
 
-```
+```text
+Found: Y2K Baby Tee — Butterfly Print — $18.0 on depop
 
-**The three tools, tested one at a time**
+Outfit:
+Two outfit ideas were generated using pieces from the user's wardrobe,
+including baggy dark-wash jeans, a black cropped zip hoodie, chunky white
+sneakers, and a black crossbody bag.
 
-```
-$ python -c "from tools import search_listings; print(search_listings('graphic tee', max_price=30))"
+Fit card:
+The generated caption described the Y2K Butterfly Baby Tee as an $18.00
+Depop find and suggested styling it with baggy denim or wide-leg trousers.
 
-```
+search_listings
+Command:
+python -c "from tools import search_listings; print(search_listings('graphic tee', max_price=30))"
 
-```
-$ python -c "from tools import suggest_outfit; ..."
+The test returned matching listings under the $30 price ceiling, including
+the Y2K Baby Tee, Graphic Tee, and other listings containing graphic-tee
+keywords.
 
-```
+suggest_outfit
 
-```
-$ python -c "from tools import create_fit_card; ..."
+Command:
+python -c "from tools import suggest_outfit; from utils.data_loader import get_example_wardrobe, load_listings; print(suggest_outfit(load_listings()[0], get_example_wardrobe()))"
 
-```
+The test returned a complete outfit suggestion for the Vintage Levi's 501 Jeans,
+using pieces from the example wardrobe.
+
+The empty-wardrobe test also returned general styling advice instead of an
+empty response.
+
+create_fit_card
+
+Command:
+python -c "from tools import create_fit_card; from utils.data_loader import load_listings; print(create_fit_card('jeans and white sneakers', load_listings()[0]))"
+
+The test returned a short social-media-style caption mentioning the Levi's 501s,
+the $38.00 price, and Depop.
+
+The empty-outfit test returned:
+No outfit suggestion was provided, so a fit card could not be created.
 
 ---
 
+
 ## How I Used AI
 
-<!-- Two specific moments. What you asked, what came back, what you changed.
+I used AI as a development assistant while building FitFindr. I used it to help
+interpret the project requirements, reason about the planning-loop structure,
+review implementation ideas, and debug test results.
 
-     "I used Claude to help me code" is not enough.
+I still tested the tools and agent locally using the provided commands and
+checked the returned results against the project requirements and my acceptance
+criteria.
 
-     "I gave Claude my search_listings spec. It returned None on no match
-     instead of an empty list, so I changed it" is the level we want. -->
+### Moment 1
 
-**Moment 1**
+- **What I asked for:** Help implementing and testing the three required tools
+  one at a time while following their required inputs, outputs, and empty cases.
+- **What came back:** Implementation suggestions for `search_listings`,
+  `suggest_outfit`, and `create_fit_card`, along with commands for testing both
+  normal and edge-case behavior.
+- **What I changed:** I implemented the three functions in `tools.py` and
+  tested each one locally, including size/price filtering, an empty wardrobe,
+  and an empty outfit.
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+### Moment 2
 
-**Moment 2**
-
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- **What I asked for:** Help wiring the planning loop so the selected listing
+  would move through the session state and the agent would stop when no
+  listings were found.
+- **What came back:** A planning-loop structure using query parsing, session
+  state, a no-results branch, and the three tools in sequence.
+- **What I changed:** I implemented the loop in `agent.py`, tested successful
+  searches and the no-results case, and verified that the no-results path
+  stopped before the outfit and fit-card tools were called.
 
 <!-- ═══════════════════════ UNIT 4 — THE TEST ═══════════════════════
 
