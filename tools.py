@@ -163,7 +163,11 @@ Outfit suggestion:
 {outfit}
 
 Write 2–4 sentences.
-Mention the item, its price, and the platform once each.
+Include the exact item title: {new_item['title']}.
+Include the price exactly as ${new_item['price']:.2f}.
+Name the platform exactly as {new_item['platform']}.
+Do not omit any of these three details or replace them with vague references.
+Mention each required detail at least once.
 Make the caption sound natural and specific to the item's vibe,
 rather than like a product listing.
 """
