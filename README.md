@@ -244,12 +244,12 @@ criteria.
      into results/. Paste it here and fill in the verdicts. -->
 
 | Criterion | Target | Try 1 | Try 2 | Try 3 | Try 4 | Try 5 | Verdict |
-|---|---|---|---|---|---|---|---|
-| 1.  |  |  |  |  |  |  |  |
-| 2.  |  |  |  |  |  |  |  |
-| 3.  |  |  |  |  |  |  |  |
-| 4.  |  |  |  |  |  |  |  |
-| 5.  |  |  |  |  |  |  |  |
+|---|---:|---|---|---|---|---|---|
+| 1. Matching query completes all three tools | 4/5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 2. Impossible query stops before outfit suggestion | 5/5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 3. Selected item reaches outfit tool | 4/5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 4. Fit card includes item details | 4/5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 5. All returned listings respect maximum price | 5/5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
 
 **Real output from one try**, pasted as text, naming the file and function
 that produced it:
@@ -280,14 +280,20 @@ that produced it:
 
 | # | Criterion | Target | Verdict | How I decided |
 |---|---|---|---|---|
-| 1 |  |  |  |  |
-| 2 |  |  |  |  |
-| 3 |  |  |  |  |
-| 4 |  |  |  |  |
-| 5 |  |  |  |  |
+| 1 | Matching query completes all three tools | 4/5 | MET (5/5) | All five trials showed the MCP search, outfit suggestion, and fit-card tools in the trace. |
+| 2 | Impossible query stops before outfit suggestion | 5/5 | MET (5/5) | All five trials returned zero listings and stopped before the outfit and fit-card tools. |
+| 3 | Selected item reaches outfit tool | 4/5 | MET (5/5) | All five traces showed `suggest_outfit` receiving `new_item` and `wardrobe`. |
+| 4 | Fit card includes item details | 4/5 | MET (5/5) | All five before-run and after-run fit cards included the selected item's title, price, and platform. |
+| 5 | All returned listings respect maximum price | 5/5 | MET (5/5) | The search implementation filters out listings whose price exceeds `max_price`; the before and after runs returned consistent result counts for the tested ceilings. |
 
 **Diagnoses**
+No acceptance criterion missed its target in the baseline evaluation, so there was no demonstrated criterion failure to diagnose. I still tested three failure modes:
 
+- **Empty search:** The MCP search returned an empty list. The agent produced an actionable message and stopped before calling the outfit and fit-card tools.
+- **Empty wardrobe:** The agent returned general styling advice instead of failing when the wardrobe contained no items.
+- **Model unavailable:** An invalid API key triggered a model-unavailable error. After restoring the key, the test suite passed again.
+
+The fit-card prompt was strengthened as a preventive improvement, not as a fix for a demonstrated baseline failure.
 
 
 ---
@@ -305,21 +311,44 @@ that produced it:
      anyone will ever find that out. -->
 
 **Happy path**
+Command: python app.py ask 'vintage graphic tee under $30' --trace
 
+[1] search_listings (via MCP)
+    in: dict with keys: description, size, max_price
+    out: 10 items: Y2K Baby Tee — Butterfly Print, Graphic Tee — 2003 Tour Bootleg Style, Mesh Long-Sleeve Top — Black ... +7 more
+[2] suggest_outfit
+    in: dict with keys: new_item, wardrobe
+    out: Here are two complete outfit ideas featuring your new Y2K butterfly baby tee...
+[3] create_fit_card
+    in: dict with keys: outfit, new_item
+    out: Channel your inner 2000s icon with this adorable Y2K Baby Tee — Butterfly Print, priced at just $18.00! ...
+
+Found: Y2K Baby Tee — Butterfly Print — $18.0 on depop
+
+Fit card: Channel your inner 2000s icon with this adorable Y2K Baby Tee — Butterfly Print, priced at just $18.00! ...
+1 model calls this session, 1 served from cache
 ```
 
 ```
 
 **Empty search**
+Command: python app.py ask 'designer ballgown size XXS under $5' --trace
+
+[1] search_listings (via MCP)
+    in: dict with keys: description, size, max_price
+    out: [] (empty)
+[2] branch
+    in: [] (empty)
+    out: No matching listings were found. Try changing the item description, size, or maximum price.
+    -> empty search: stopping
+
+No matching listings were found. Try changing the item description, size, or maximum price.
+0 model calls this session
 
 ```
 
-```
-
-**On the MCP move:** <!-- what changed in your code, and whether anything
-behaved differently afterwards. If the rewire didn't work, say exactly where it
-broke — the error text and the last thing that worked. That earns the point in
-full. -->
+**On the MCP move:** 
+I moved `search_listings` to the MCP server by registering it in `mcp_server.py` and calling it through `mcp_client.py` from the agent. The happy-path trace confirms that the MCP search runs before `suggest_outfit` and `create_fit_card`. The empty-search trace confirms that MCP returns an empty list and the agent stops at the branch without calling the later tools. The rewire worked in both cases.
 
 
 
@@ -334,33 +363,36 @@ full. -->
 
 **What I changed:**
 
+I made one improvement in `tools.py` inside `create_fit_card()`. I strengthened the prompt to require the exact item title, price formatted to two decimal places, and platform name. The prompt also tells the model not to omit these details or replace them with vague references.
+
 **Which failure it was meant to fix:**
+
+This was a preventive improvement intended to make fit-card captions more consistent and specific. The baseline evaluation already passed Criterion 4 in all five trials, so there was no demonstrated failure for this change to fix. The improvement was tested to verify that the required details continued to appear.
 
 ### Run Log — After
 
 | Criterion | Target | Try 1 | Try 2 | Try 3 | Try 4 | Try 5 | Verdict |
-|---|---|---|---|---|---|---|---|
-| 1.  |  |  |  |  |  |  |  |
-| 2.  |  |  |  |  |  |  |  |
-| 3.  |  |  |  |  |  |  |  |
-| 4.  |  |  |  |  |  |  |  |
-| 5.  |  |  |  |  |  |  |  |
+|---|---:|---|---|---|---|---|---|
+| 1. Matching query completes all three tools | 4/5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 2. Impossible query stops before outfit suggestion | 5/5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 3. Selected item reaches outfit tool | 4/5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 4. Fit card includes item details | 4/5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 5. All returned listings respect maximum price | 5/5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
 
 **Did it help, and how do I know:**
 
-<!-- If it made things worse, say that. Honestly reported, that earns full
-     credit and is more interesting than one that worked. -->
-
+The after-run retained the same five-of-five result for Criterion 4: all five fit cards included the selected item's title, price, and platform. The other criteria also retained their passing results. The change strengthened the prompt, but it did not increase the measured score because the baseline already met every target.
 
 
 ---
 
 ## What's Still Broken
 
-<!-- For each criterion still missed: what you'd do, and why you stopped where
-     you did. "I ran out of time" is fine if it's true. Pretending nothing is
-     left is not. -->
+No acceptance criteria missed their targets in the evaluated runs. However, the fit-card improvement did not demonstrate a higher score because Criterion 4 was already passing before the change.
 
+The price-ceiling check is implemented in the search function, which filters out listings priced above `max_price`. A useful next step would be to add an automated assertion that checks the price of every returned listing for each ceiling, rather than relying on result counts and inspection of the implementation.
+
+The model-unavailable scenario was also tested manually by temporarily using an invalid API key. Restoring the key allowed the test suite to pass again. These tests provide useful evidence, but more automated checks for failure handling would make the project easier to validate in future changes.
 
 
 <!-- ═════════════════════════════════════════════════════════════════════

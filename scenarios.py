@@ -35,18 +35,50 @@ SCENARIOS = [
         "wardrobe": "empty",
         "criterion": None,
     },
-    # TODO: add what your criteria 3, 4 and 5 need.
-    #
-    # Set "criterion" to the number in criteria.md that the scenario tests.
-    # "criterion": None means a diagnostic run — useful to have, but it isn't
-    # one of your five, and run_eval.py marks it as such in the table.
-    #
-    # For a state criterion, any normal query works — what you're checking is
-    # what ends up in the session, not what the user typed.
-    #
-    # For a fit-card criterion, you probably want the SAME query listed more
-    # than once, or several different items, depending on what your criterion
-    # actually says.
+    {
+        # Criterion 3: check that selected_item is passed to suggest_outfit.
+        "name": "selected item reaches outfit tool",
+        "query": "vintage graphic tee under $30",
+        "wardrobe": "example",
+        "criterion": 3,
+    },
+    {
+        # Criterion 4: check required details in the generated fit card.
+        "name": "fit card includes item details",
+        "query": "vintage graphic tee under $30",
+        "wardrobe": "example",
+        "criterion": 4,
+    },
+    {
+        "name": "price ceiling under $15",
+        "query": "graphic tee under $15",
+        "wardrobe": "example",
+        "criterion": 5,
+    },
+    {
+        "name": "price ceiling under $20",
+        "query": "graphic tee under $20",
+        "wardrobe": "example",
+        "criterion": 5,
+    },
+    {
+        "name": "price ceiling under $25",
+        "query": "graphic tee under $25",
+        "wardrobe": "example",
+        "criterion": 5,
+    },
+    {
+        "name": "price ceiling under $30",
+        "query": "graphic tee under $30",
+        "wardrobe": "example",
+        "criterion": 5,
+    },
+    {
+        "name": "price ceiling under $40",
+        "query": "graphic tee under $40",
+        "wardrobe": "example",
+        "criterion": 5,
+    },
 ]
 
 WARDROBES = ("example", "empty")
